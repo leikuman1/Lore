@@ -26,7 +26,7 @@
 
 ## 验收标准
 
-- [ ] 干净检出后 `pnpm install --frozen-lockfile && pnpm check` 通过（当前工作区已通过；仓库尚无提交，干净检出未验证）；离线测试无需数据库、真实密钥或网络，未预期请求会失败。
+- [x] 干净检出后 `pnpm install --frozen-lockfile && pnpm check` 通过；离线测试无需数据库、真实密钥或网络，未预期请求会失败。
 - [x] 覆盖无工具调用路径，以及 mock 发起一次工具调用、参数校验、工具仅执行一次、结果回填和生成最终文本的完整路径。
 - [x] 非法工具参数不执行工具；未注册工具被拒绝；工具抛错有明确摘要并终止循环，无无限重试。
 - [x] 达到步数上限、超时或 Abort 时及时结束，结束原因明确，取消信号传递到模型与工具，无悬挂任务；中途失败保留已完成步骤摘要。
@@ -37,7 +37,7 @@
 
 ## 额外事项
 
-- **状态**：阶段一已实现，当前工作区通过离线与本地服务验证，干净检出验证待首次提交后执行，证据见 [phase-01-verification.md](phase-01-verification.md)；Magpie / DeepSeek 真实模型 smoke 已通过，`docs/acceptance.md` 中后续功能仍未完成。
+- **状态**：阶段一已实现，当前工作区与独立干净检出均通过离线与本地服务验证，证据见 [phase-01-verification.md](phase-01-verification.md)；Magpie / DeepSeek 真实模型 smoke 已通过，`docs/acceptance.md` 中后续功能仍未完成。
 - **SDK 选择**：以已安装的 `ai@7.0.130` 类型和 `ai/test` 为准；优先使用 `ToolLoopAgent`，无法满足步骤记录时使用 `streamText` + `stopWhen`，实现时记录选择。
 - **模型接入**：采用本机 Magpie，支持 `MODEL_API=chat|responses`；本地配置 DeepSeek，模型 ID 不写死。mock 只验证协议与执行流程；DeepSeek 真实工具 smoke 已通过，广泛任务质量仍需另行评估。
 - **实施与证据**：先确认现有 `pnpm check` 基线；各项实现前写失败测试或明确复现方式，演示使用 curl 或测试即可，无需 UI。
