@@ -1,0 +1,45 @@
+{
+  "name": "lore",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A recoverable tool-using agent built from scratch with TypeScript and Vercel AI SDK.",
+  "type": "module",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "scripts": {
+    "dev": "node scripts/with-ca.mjs --import tsx --watch src/api/index.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node scripts/with-ca.mjs --enable-source-maps dist/api/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke:phase-01": "pnpm build && node scripts/smoke-phase-01.mjs",
+    "smoke:model": "node scripts/with-ca.mjs --import tsx scripts/smoke-model.ts",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "doctor": "tsx scripts/doctor.ts",
+    "db:check": "node scripts/with-ca.mjs --import tsx scripts/check-db.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/mcp": "2.0.70",
+    "@ai-sdk/openai": "4.0.88",
+    "@hono/node-server": "2.1.5",
+    "ai": "7.0.130",
+    "dotenv": "18.0.9",
+    "graphile-worker": "0.18.0",
+    "hono": "4.13.13",
+    "pg": "8.23.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/node": "24.19.2",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.5"
+  }
+}
