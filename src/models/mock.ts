@@ -11,30 +11,56 @@ type StreamPart =
 export function createMockModel(options: { repeatTools?: boolean } = {}): Model {
   const generate = (call: CallOptions): GenerateResult => {
     call.abortSignal?.throwIfAborted();
-    const message = call.prompt.find((entry) => entry.role === "user");
+    const message = call.prompt.findLast((entry) => entry.role === "user");
     const text = message?.content.find((part) => part.type === "text")?.text ?? "lore";
-    const previous = call.prompt
+    const current = call.prompt.slice(
+      call.prompt.findLastIndex((entry) => entry.role === "user") + 1,
+    );
+    const previous = current
       .filter((entry) => entry.role === "tool")
       .flatMap((entry) => entry.content)
       .filter((part) => part.type === "tool-result");
+    const workspace = call.tools?.some((entry) => entry.name === "list_files") ?? false;
     const plainText = text.startsWith("text:");
-    const useTool = !plainText && (options.repeatTools || previous.length === 0);
+    let toolName = "lookup_reference";
+    let input: unknown = { key: text };
+    let commandError = "";
+    if (workspace) {
+      toolName = "list_files";
+      input = { path: "." };
+      if (text.startsWith("mock:")) {
+        try {
+          const parsed: unknown = JSON.parse(text.slice(5));
+          if (!parsed || typeof parsed !== "object" || !("tool" in parsed) || !("input" in parsed))
+            throw new Error("Invalid mock command");
+          const command = parsed as { tool: unknown; input: unknown };
+          if (typeof command.tool !== "string") throw new Error("Invalid mock tool");
+          toolName = command.tool;
+          input = command.input;
+        } catch {
+          commandError = 'mock 命令格式：mock:{"tool":"list_files","input":{"path":"."}}';
+        }
+      }
+    }
+    const useTool = !plainText && !commandError && (options.repeatTools || previous.length === 0);
     return {
       content: useTool
         ? [
             {
               type: "tool-call",
               toolCallId: `mock-call-${previous.length + 1}`,
-              toolName: "lookup_reference",
-              input: JSON.stringify({ key: text }),
+              toolName,
+              input: JSON.stringify(input),
             },
           ]
         : [
             {
               type: "text",
-              text: plainText
-                ? `[mock] ${text.slice(5)}`
-                : `[mock] ${JSON.stringify(previous.at(-1)?.output)}`,
+              text:
+                commandError ||
+                (plainText
+                  ? `[mock] ${text.slice(5)}`
+                  : `[mock${workspace ? " 工作区演示" : ""}] ${JSON.stringify(previous.at(-1)?.output)}`),
             },
           ],
       finishReason: { unified: useTool ? "tool-calls" : "stop", raw: undefined },

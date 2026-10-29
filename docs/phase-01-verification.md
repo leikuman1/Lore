@@ -53,6 +53,15 @@
 - 数据库测试只构造 pg 客户端并检查生效的 SSL 配置，不连接外部数据库；覆盖缺少 TLS 配置、禁用校验选项、loopback 连接与 URL 主机覆盖拒绝。
 - HTTP 测试确认非 loopback 主机在执行器启动前返回 403，模型配置测试拒绝远程明文 HTTP。
 
+## CodeRabbit 第二轮意见修复（本地）
+
+2026-10-29 查看 PR #1 对提交 `0b9479c` 的最新复查，新增两项意见均确认有效并在本地修复：
+
+- MCP 示例增加 `features=database,docs,debugging`，保留开发项目范围与只读模式，README 同步说明；JSON 与 URL 参数断言通过。
+- SIGTERM 测试以独立 POSIX 进程组启动，五秒超时与 finally 清理整个进程组，避免子 Node 进程继续持有管道；增加真实五秒超时回归用例。
+- 本地 `pnpm check` 通过：164 项通过、3 项跳过，包含阶段二当前工作区。两个 POSIX 测试在 Windows 跳过；Debian WSL 缺少原生 Node，临时下载运行时超时，未完成本轮 Linux 实测。
+- 两项修复随阶段二变更交付；PR #1 的 CodeRabbit 状态对应旧提交，修复后的远程复审与 Linux CI 以新 PR 结果为准。
+
 ## 未运行与边界
 
 - 公开内容检查：`.env` 和个人 `.mcp.json` 均未跟踪；提交通用 `.env.example` 和只读 `.mcp.example.json`。文档不包含个人数据库连接串、项目标识或本机路径，仅保留项目功能与验证信息。

@@ -2,6 +2,15 @@ import { spawn } from "node:child_process";
 import { once } from "node:events";
 import { expect, it } from "vitest";
 
+function killProcessGroup(pid: number | undefined) {
+  if (pid === undefined) return;
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+  }
+}
+
 it("preserves the child environment, working directory and exit code", async () => {
   const child = spawn(
     process.execPath,
@@ -36,10 +45,10 @@ it.skipIf(process.platform === "win32")(
         "-e",
         'process.on("SIGTERM",()=>{console.log("stopped");process.exit(0)});console.log("ready");setInterval(()=>{},1000);',
       ],
-      { stdio: ["ignore", "pipe", "pipe"] },
+      { detached: true, stdio: ["ignore", "pipe", "pipe"] },
     );
     let output = "";
-    const timeout = setTimeout(() => child.kill("SIGKILL"), 5_000);
+    const timeout = setTimeout(() => killProcessGroup(child.pid), 5_000);
     const closed = once(child, "close");
     child.stderr.resume();
     child.stdout.on("data", (chunk: Buffer) => {
@@ -53,7 +62,40 @@ it.skipIf(process.platform === "win32")(
       expect(output).toContain("stopped");
     } finally {
       clearTimeout(timeout);
-      if (child.exitCode === null && child.signalCode === null) child.kill("SIGKILL");
+      killProcessGroup(child.pid);
+    }
+  },
+  10_000,
+);
+
+it.skipIf(process.platform === "win32")(
+  "closes inherited pipes when the five-second timeout kills the process group",
+  async () => {
+    const child = spawn(
+      process.execPath,
+      ["scripts/with-ca.mjs", "-e", 'console.log("ready");setInterval(()=>{},1000);'],
+      { detached: true, stdio: ["ignore", "pipe", "pipe"] },
+    );
+    let output = "";
+    let timedOut = false;
+    child.stdout.on("data", (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.stderr.resume();
+    const closed = once(child, "close");
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      killProcessGroup(child.pid);
+    }, 5_000);
+    try {
+      const [code, signal] = await closed;
+      expect(timedOut).toBe(true);
+      expect(output).toContain("ready");
+      expect(code).toBeNull();
+      expect(signal).toBe("SIGKILL");
+    } finally {
+      clearTimeout(timeout);
+      killProcessGroup(child.pid);
     }
   },
   10_000,

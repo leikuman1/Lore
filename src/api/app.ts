@@ -6,9 +6,12 @@ import {
   invocationInputSchema,
 } from "../agent/contracts.js";
 import { invokeAgent } from "../agent/invoke.js";
+import { WorkspaceSessions } from "../agent/sessions.js";
 import { type Environment, parseEnvironment } from "../config/env.js";
 import { isLoopbackHostname } from "../config/loopback.js";
 import { resolveModel } from "../models/resolve.js";
+import { pickDirectory } from "../workspace/picker.js";
+import { mountWorkspace } from "./workspace.js";
 
 const errorStatuses = {
   INVALID_REQUEST: 400,
@@ -20,6 +23,7 @@ const errorStatuses = {
   STEP_LIMIT: 422,
   TIMEOUT: 504,
   ABORTED: 408,
+  CONTEXT_LIMIT: 422,
 } as const satisfies Record<ErrorCode, number>;
 
 async function readBody(request: Request): Promise<unknown> {
@@ -46,7 +50,11 @@ async function readBody(request: Request): Promise<unknown> {
 }
 
 export function createApp(
-  options: { env?: Environment; onEvent?: (event: InvocationEvent) => void } = {},
+  options: {
+    env?: Environment;
+    onEvent?: (event: InvocationEvent) => void;
+    pickDirectory?: (signal?: AbortSignal) => Promise<string | null>;
+  } = {},
 ) {
   const env = options.env ?? parseEnvironment({});
   const model = resolveModel(env);
@@ -95,5 +103,7 @@ export function createApp(
     return context.json(result, result.error ? errorStatuses[result.error.code] : 200);
   });
 
-  return app;
+  const sessions = new WorkspaceSessions({ env, ...(model ? { model } : {}), onEvent });
+  mountWorkspace(app, sessions, options.pickDirectory ?? pickDirectory, readBody);
+  return Object.assign(app, { close: () => sessions.close() });
 }

@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { isStepCount, type LanguageModel, NoSuchToolError, streamText, type ToolSet } from "ai";
+import {
+  isStepCount,
+  type LanguageModel,
+  type ModelMessage,
+  NoSuchToolError,
+  streamText,
+  type ToolSet,
+} from "ai";
 import { z } from "zod";
 import { createReferenceTools } from "../tools/reference.js";
 import {
@@ -26,6 +33,12 @@ type InvocationOptions = {
   invocationId?: string;
   now?: () => number;
   onEvent?: (event: InvocationEvent) => void;
+  history?: ModelMessage[];
+  system?: string;
+  onMessages?: (messages: ModelMessage[]) => void;
+  maxContextBytes?: number;
+  includeToolPaths?: boolean;
+  recoverableToolErrors?: boolean;
 };
 
 export async function invokeAgent(
@@ -49,7 +62,12 @@ export async function invokeAgent(
     usage: null,
   };
   let step = 1;
-  const emit = (event: InvocationEvent["event"], status: string, tool: string | null = null) => {
+  const emit = (
+    event: InvocationEvent["event"],
+    status: string,
+    tool: string | null = null,
+    path?: string,
+  ) => {
     const record: InvocationEvent = {
       invocationId: result.invocationId,
       event,
@@ -57,6 +75,7 @@ export async function invokeAgent(
       tool,
       status,
       durationMs: Math.max(0, now() - started),
+      ...(path ? { path } : {}),
     };
     result.events.push(record);
     try {
@@ -96,7 +115,23 @@ export async function invokeAgent(
   try {
     const stream = streamText({
       model,
-      prompt: parsedInput.data.message,
+      messages: [...(options.history ?? []), { role: "user", content: parsedInput.data.message }],
+      ...(options.system ? { system: options.system } : {}),
+      maxOutputTokens: 4096,
+      prepareStep: ({ messages }) => {
+        if (
+          options.maxContextBytes &&
+          Buffer.byteLength(JSON.stringify(messages)) + Buffer.byteLength(options.system ?? "") >
+            options.maxContextBytes
+        ) {
+          fail("CONTEXT_LIMIT");
+          controller.abort();
+          throw new Error("Context limit");
+        }
+      },
+      onStepEnd: ({ response }) => {
+        options.onMessages?.(response.messages);
+      },
       abortSignal: controller.signal,
       onError: () => {},
       tools: options.tools ?? createReferenceTools(),
@@ -126,7 +161,16 @@ export async function invokeAgent(
         if (!part.invalid) summary.input = part.input;
         result.steps.push(summary);
         calls.set(part.toolCallId, summary);
-        emit("tool_requested", "requested", part.toolName);
+        const target =
+          !part.invalid &&
+          options.includeToolPaths &&
+          part.input &&
+          typeof part.input === "object" &&
+          "path" in part.input &&
+          typeof part.input.path === "string"
+            ? part.input.path
+            : undefined;
+        emit("tool_requested", "requested", part.toolName, target);
         if (part.invalid) {
           const code = NoSuchToolError.isInstance(part.error)
             ? "TOOL_NOT_ALLOWED"
@@ -143,11 +187,21 @@ export async function invokeAgent(
         }
       } else if (part.type === "tool-result") {
         const summary = calls.get(part.toolCallId);
+        const rejected =
+          options.recoverableToolErrors &&
+          part.output &&
+          typeof part.output === "object" &&
+          "error" in part.output;
         if (summary) {
-          summary.status = "succeeded";
+          summary.status = rejected ? "failed" : "succeeded";
           summary.result = part.output;
+          if (rejected) summary.error = { code: "TOOL_ERROR", message: errorMessages.TOOL_ERROR };
         }
-        emit("tool_completed", "succeeded", part.toolName);
+        emit(
+          rejected ? "tool_failed" : "tool_completed",
+          rejected ? "failed" : "succeeded",
+          part.toolName,
+        );
       } else if (part.type === "tool-error") {
         const summary = calls.get(part.toolCallId);
         const code: ErrorCode = "TOOL_ERROR";
