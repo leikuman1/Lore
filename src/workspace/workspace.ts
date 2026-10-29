@@ -170,6 +170,7 @@ export class Workspace {
     return operation;
   }
 
+  /** 等待已启动的文件操作结束，避免取消后切换工作区时仍有写入进行。 */
   async drain(): Promise<void> {
     while (this.pending.size) await Promise.allSettled([...this.pending]);
   }
@@ -262,6 +263,7 @@ export class Workspace {
     }
   }
 
+  /** 每次访问重新核对根目录身份及所有路径分量；创建只允许最后一级不存在。 */
   private async target(input: string, missing = false, allowRoot = false): Promise<string> {
     const rel = relative(input, allowRoot);
     await Workspace.checkAncestors(this.root);
@@ -292,6 +294,7 @@ export class Workspace {
     return current;
   }
 
+  /** 有界读取，并比较路径与打开句柄的前后身份，检测常规并发替换或修改。 */
   private async snapshot(input: string, signal?: AbortSignal): Promise<Snapshot> {
     check(signal);
     const target = await this.target(input);
@@ -326,6 +329,7 @@ export class Workspace {
     }
   }
 
+  /** offset/limit 按行计数；只有完整读取才授予后续精确修改所需的版本凭据。 */
   private async readInternal(
     input: string,
     offset = 0,
@@ -404,6 +408,7 @@ export class Workspace {
     return result;
   }
 
+  /** 深度优先的字面搜索，独立限制遍历、输出及成功读取字节，预留额度逐文件结算。 */
   private async searchInternal(
     query: string,
     mode: "name" | "content",
@@ -482,11 +487,15 @@ export class Workspace {
         try {
           text = (await this.snapshot(child, signal)).text;
         } catch (error) {
+          result.bytesRead -= WORKSPACE_LIMITS.fileBytes;
           check(signal);
           if ((error as Error).name === "AbortError") throw error;
           result.excluded++;
           continue;
         }
+        // UTF-8 decoding preserves BOM and line endings, so this settles the
+        // reservation against the original byte count rather than file count.
+        result.bytesRead -= WORKSPACE_LIMITS.fileBytes - Buffer.byteLength(text);
         const lines = text.split("\n");
         for (let i = 0; i < lines.length; i++) {
           check(signal);
@@ -509,6 +518,7 @@ export class Workspace {
     return result;
   }
 
+  /** 按调用顺序串行写入；取得写锁后再次检查取消，失败也必须释放后续操作。 */
   private async write<T>(action: () => Promise<T>, signal?: AbortSignal): Promise<T> {
     const previous = this.queue;
     let release: () => void = () => {};
@@ -560,6 +570,7 @@ export class Workspace {
     }, signal);
   }
 
+  /** 校验完整读取版本，以同目录临时文件暂存，提交前复查冲突，提交后立即记账。 */
   private async editInternal(
     input: string,
     oldText: string,

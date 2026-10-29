@@ -41,6 +41,7 @@ type InvocationOptions = {
   recoverableToolErrors?: boolean;
 };
 
+/** 执行有步数和时限的工具循环，保留首个失败及已完成步骤；取消不会撤销工具效果。 */
 export async function invokeAgent(
   input: InvocationInput,
   options: InvocationOptions = {},

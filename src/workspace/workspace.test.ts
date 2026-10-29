@@ -289,6 +289,40 @@ describe("bounded traversal", () => {
     expect(bytes.truncated).toBe(true);
   });
 
+  it("searches beyond sixteen small UTF-8 files and settles the actual byte count", async () => {
+    const contents = Array.from({ length: 40 }, (_, index) =>
+      index % 2 === 0 ? "" : `﻿needle-${index} 中文\r\n`,
+    );
+    await Promise.all(contents.map((content, index) => file(`small-${index}.txt`, content)));
+    const result = await workspace.search("needle", "content");
+    expect(result.truncated).toBe(false);
+    expect(result.visited).toBe(40);
+    expect(result.bytesRead).toBe(
+      contents.reduce((bytes, content) => bytes + Buffer.byteLength(content), 0),
+    );
+    expect(result.matches).toHaveLength(20);
+    for (let index = 1; index < 40; index += 2)
+      expect(result.matches).toContainEqual({
+        path: `small-${index}.txt`,
+        line: 1,
+        text: contents[index]?.slice(0, -1),
+      });
+  });
+
+  it("releases reservations for rejected text reads", async () => {
+    await Promise.all(
+      Array.from({ length: 20 }, (_, index) =>
+        file(`binary-${index}.txt`, Buffer.alloc(WORKSPACE_LIMITS.fileBytes)),
+      ),
+    );
+    await file("valid.txt", "needle");
+    const result = await workspace.search("needle", "content");
+    expect(result.truncated).toBe(false);
+    expect(result.excluded).toBe(20);
+    expect(result.bytesRead).toBe(Buffer.byteLength("needle"));
+    expect(result.matches).toEqual([{ path: "valid.txt", line: 1, text: "needle" }]);
+  });
+
   it("reports depth exhaustion", async () => {
     let nested = root;
     for (let i = 0; i < WORKSPACE_LIMITS.depth + 2; i++) {

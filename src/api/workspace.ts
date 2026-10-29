@@ -9,6 +9,7 @@ import { DirectoryPickerError } from "../workspace/picker.js";
 const inputSchema = invocationInputSchema.extend({ sessionId: z.uuid() });
 const emptySchema = z.strictObject({});
 
+/** 挂载本机页面与会话接口；同源检查保护浏览器操作，文件权限仍由后端工作区裁决。 */
 export function mountWorkspace(
   app: Hono,
   sessions: WorkspaceSessions,

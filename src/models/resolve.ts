@@ -3,6 +3,7 @@ import type { LanguageModel } from "ai";
 import type { Environment } from "../config/env.js";
 import { createMockModel } from "./mock.js";
 
+/** 只创建已配置的模型客户端；此处不发请求，也不推断或回退到其他服务。 */
 export function resolveModel(env: Environment): Exclude<LanguageModel, string> | undefined {
   if (env.MODEL_PROVIDER === "mock") {
     if (env.NODE_ENV === "production") throw new Error("Mock is disabled in production.");

@@ -117,6 +117,7 @@ export class WorkspaceSessions {
     return this.snapshot();
   }
 
+  /** 保留最近一轮必要上下文，按完整任务裁剪旧消息，避免拆散工具调用与结果。 */
   start(sessionId: string, message: string) {
     this.idle();
     const session = this.session;
@@ -162,6 +163,7 @@ export class WorkspaceSessions {
     return { runId: run.id, ...(run.notice ? { notice: run.notice } : {}) };
   }
 
+  /** 取消后先收齐文件效果再解锁；失败任务只保留状态说明，不重放未完成的工具调用。 */
   private async execute(session: Session, run: Run, message: string, controller: AbortController) {
     const response: ModelMessage[] = [];
     try {
