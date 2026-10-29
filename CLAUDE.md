@@ -25,9 +25,9 @@ Lore 是使用 TypeScript + Vercel AI SDK 构建的工具型 Agent 项目。当�
 - `pnpm check`：lint → typecheck → test → build。
 - `pnpm db:check`：显式使用 `.env` 中 DATABASE_URL，仅做只读连接与版本检查。数据库为 **Supabase Postgres**：使用 Session pooler（5432）或直连，不要用 Transaction pooler（6543），Graphile Worker 的 advisory lock、LISTEN/NOTIFY 与 prepared statement 都依赖会话。
 
-阶段一演示：PowerShell 中执行 `$env:MODEL_PROVIDER="mock"; pnpm dev`，再向 `/agent/invoke` 发送 JSON `{ "message": "lore" }`；`text:hello` 演示无工具路径。`AGENT_MAX_STEPS` 默认 4、范围 1–8，`AGENT_TIMEOUT_MS` 默认 30000、范围 1–120000。仅固定监听 `127.0.0.1`。
+阶段一演示：PowerShell 中执行 `$env:MODEL_PROVIDER="mock"; pnpm dev`，再向 `/agent/invoke` 发送 JSON `{ "message": "lore" }`；`text:hello` 演示无工具路径。`AGENT_MAX_STEPS` 默认 4、范围 1–8，`AGENT_TIMEOUT_MS` 默认 30000、范围 1–120000。仅固定监听 `127.0.0.1`，请求主机名仅允许 loopback；Magpie 的 HTTP 地址只允许 loopback，远程地址必须 HTTPS。
 
-目前没有 Worker 启动或业务迁移命令，新增实现后同步命令文档。`dev`、`start`、`db:check` 通过 `scripts/with-ca.mjs` 在子 Node 启动前加载 `certs/supabase-root-2021.crt`，不可用关闭 TLS 校验代替；新增数据库运行入口也应复用此启动器。显式的外部 `NODE_EXTRA_CA_CERTS` 优先。普通测试不读取开发 `.env`、不依赖真实数据库或模型。真实数据库与真实模型测试应分离并显式开启。
+目前没有 Worker 启动或业务迁移命令，新增实现后同步命令文档。`dev`、`start`、`db:check` 通过 `scripts/with-ca.mjs` 在子 Node 启动前加载 `certs/supabase-root-2021.crt`，启动器转发 SIGINT / SIGTERM；数据库检查对远程地址强制 TLS 并校验证书，不可用关闭 TLS 校验代替；新增数据库运行入口也应复用此启动器。显式的外部 `NODE_EXTRA_CA_CERTS` 优先。普通测试不读取开发 `.env`、不依赖真实数据库或模型。真实数据库与真实模型测试应分离并显式开启。
 
 ## 结构与依赖方向
 

@@ -34,6 +34,9 @@ describe("model configuration", () => {
     expect(() => parseEnvironment({ MODEL_PROVIDER: "magpie" })).toThrow("MODEL_ID");
     for (const url of [
       "not-a-url",
+      "http://gateway.example.test/v1",
+      "http://localhost.attacker.example/v1",
+      "http://127.0.0.1.attacker.example/v1",
       "file:///tmp/model",
       "https://user:secret@example.test/v1",
       "http://localhost/v1?key=secret",
@@ -43,6 +46,18 @@ describe("model configuration", () => {
       ).toThrow("Invalid environment configuration: MODEL_BASE_URL");
     }
     expect(() => parseEnvironment({ MODEL_API: "invalid" })).toThrow("MODEL_API");
+  });
+
+  it.each([
+    "http://127.0.0.1:3425/v1",
+    "http://localhost:3425/v1",
+    "http://[::1]:3425/v1",
+    "https://gateway.example.test/v1",
+  ])("accepts a secure or loopback model endpoint %s", (url) => {
+    expect(
+      parseEnvironment({ MODEL_PROVIDER: "magpie", MODEL_ID: "fixture", MODEL_BASE_URL: url })
+        .MODEL_BASE_URL,
+    ).toBe(url);
   });
 
   it("round-trips Magpie chat tool calls through an offline HTTP fixture", async () => {

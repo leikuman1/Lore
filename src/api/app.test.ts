@@ -26,6 +26,24 @@ describe("agent HTTP API", () => {
     expect(await response.json()).toEqual({ service: "lore", status: "ok", stage: "phase-01" });
   });
 
+  it.each(["localhost", "127.0.0.1", "[::1]"])("allows loopback host %s", async (host) => {
+    expect((await mockApp().request(`http://${host}/health`)).status).toBe(200);
+  });
+
+  it.each(["attacker.example", "localhost.attacker.example", "127.0.0.1.attacker.example"])(
+    "rejects non-loopback host %s before execution",
+    async (host) => {
+      const onEvent = vi.fn();
+      const app = createApp({ env: parseEnvironment({ MODEL_PROVIDER: "mock" }), onEvent });
+      const response = await app.request(`http://${host}/agent/invoke`, post('{"message":"lore"}'));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({
+        error: { code: "HOST_NOT_ALLOWED", message: expect.any(String) },
+      });
+      expect(onEvent).not.toHaveBeenCalled();
+    },
+  );
+
   it("returns a structured mock invocation", async () => {
     const response = await mockApp().request(
       "/agent/invoke",

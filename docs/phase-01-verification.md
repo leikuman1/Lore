@@ -44,6 +44,15 @@
 - SDK 返回用量：输入 764 tokens（其中缓存读取 256），输出 80 tokens，总计 844 tokens。未推算费用。
 - 测试走真实模型与实际执行器，未启动 HTTP 服务；HTTP 路由由此前本地 mock 服务 smoke 验证。
 
+## PR 审查修复验证
+
+2026-10-29 处理 CodeRabbit 的 8 项意见：MCP 示例限定开发项目、PowerShell 请求示例、400 响应契约、Claude Code 内授权说明、远程数据库 TLS、启动器信号转发、HTTP 主机名允许列表及远程模型 HTTPS。
+
+- `pnpm check`：本地通过；POSIX SIGTERM 测试在 Windows 跳过，由 Linux CI 执行。
+- `pnpm smoke:phase-01`：通过，异步启动器下的健康接口、工具闭环和生产 mock 保护正常。
+- 数据库测试只构造 pg 客户端并检查生效的 SSL 配置，不连接外部数据库；覆盖缺少 TLS 配置、禁用校验选项、loopback 连接与 URL 主机覆盖拒绝。
+- HTTP 测试确认非 loopback 主机在执行器启动前返回 403，模型配置测试拒绝远程明文 HTTP。
+
 ## 未运行与边界
 
 - 公开内容检查：`.env` 和个人 `.mcp.json` 均未跟踪；提交通用 `.env.example` 和只读 `.mcp.example.json`。文档不包含个人数据库连接串、项目标识或本机路径，仅保留项目功能与验证信息。

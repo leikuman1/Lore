@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isLoopbackHostname } from "./loopback.js";
 
 const optionalText = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -33,6 +34,7 @@ const environmentSchema = z
         if (
           !url ||
           !["http:", "https:"].includes(url.protocol) ||
+          (url.protocol === "http:" && !isLoopbackHostname(url.hostname)) ||
           url.username ||
           url.password ||
           url.search ||
@@ -41,7 +43,8 @@ const environmentSchema = z
           context.addIssue({
             code: "custom",
             path: ["MODEL_BASE_URL"],
-            message: "Expected an HTTP API base URL without credentials, query or fragment.",
+            message:
+              "Expected HTTPS (HTTP allowed only for loopback), without credentials, query or fragment.",
           });
         }
       }

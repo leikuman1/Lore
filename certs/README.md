@@ -8,4 +8,6 @@
 
 `pnpm dev`、`pnpm start`、`pnpm db:check` 通过 `scripts/with-ca.mjs` 在子 Node 进程启动前设置 `NODE_EXTRA_CA_CERTS`，保留证书链与主机名校验，不修改系统证书库。显式设置的外部 `NODE_EXTRA_CA_CERTS` 优先；若覆盖它，提供的证书包应包含所需 Supabase CA。
 
+启动器使用异步子进程并转发 SIGINT / SIGTERM，退出码跟随子进程；数据库检查对远程连接强制 TLS 与证书校验，不接受连接串中的降级选项。
+
 部署编译产物时同时携带 `scripts/with-ca.mjs` 与本目录；只复制 `dist` 不足以使用 `pnpm start`。

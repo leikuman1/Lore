@@ -7,6 +7,7 @@ import {
 } from "../agent/contracts.js";
 import { invokeAgent } from "../agent/invoke.js";
 import { type Environment, parseEnvironment } from "../config/env.js";
+import { isLoopbackHostname } from "../config/loopback.js";
 import { resolveModel } from "../models/resolve.js";
 
 const errorStatuses = {
@@ -52,6 +53,16 @@ export function createApp(
   const onEvent =
     options.onEvent ?? ((event: InvocationEvent) => console.info(JSON.stringify(event)));
   const app = new Hono();
+
+  app.use("*", async (context, next) => {
+    if (!isLoopbackHostname(new URL(context.req.url).hostname)) {
+      return context.json(
+        { error: { code: "HOST_NOT_ALLOWED", message: "Only loopback hosts are allowed." } },
+        403,
+      );
+    }
+    await next();
+  });
 
   app.get("/health", (context) =>
     context.json({ service: "lore", status: "ok", stage: "phase-01" }),

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import pg from "pg";
+import { databaseConnectionConfig } from "../src/config/database.js";
 import { parseEnvironment } from "../src/config/env.js";
 
 async function main() {
@@ -9,7 +10,7 @@ async function main() {
   }
 
   const client = new pg.Client({
-    connectionString: env.DATABASE_URL,
+    ...databaseConnectionConfig(env.DATABASE_URL),
     connectionTimeoutMillis: 5_000,
     query_timeout: 5_000,
     application_name: "lore-db-check",
