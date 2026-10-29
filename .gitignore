@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.mcp.json
+*.key
+*.p12
+*.pfx
+id_ed25519*
+id_rsa*
+*.tsbuildinfo
+*.log
+.DS_Store
+.claude/settings.local.json
