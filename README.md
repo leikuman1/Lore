@@ -114,7 +114,7 @@ Supabase 项目可在 Dashboard → Connect 复制连接串，或在本机使用
 
 ### 模型连接与 Magpie
 
-API key 由使用者在本地 `.env` 或进程环境中配置，仓库只提交字段为空的 `.env.example`。除了 key，还需设置服务地址、模型 ID 和协议；key 本身不能确定要调用哪个服务。
+使用 Magpie 时，必填 `MODEL_PROVIDER=magpie` 和 `MODEL_ID`。`MODEL_BASE_URL` 默认为 `http://127.0.0.1:3425/v1`，`MODEL_API` 默认为 `chat`，只有需要覆盖默认值时才设置它们。网关要求认证时，由使用者在本地 `.env` 或进程环境中配置 `MODEL_API_KEY`；仓库仅提交不含真实密钥的 `.env.example`。
 
 当前真实模型入口名为 `magpie`，通过 `@ai-sdk/openai` 发送兼容协议请求，默认地址是本机 Magpie。Magpie 负责将请求交给其配置的上游模型，Lore 不读取或发布网关的上游账号配置。地址、模型和 key 都可以由用户覆盖；其他兼容服务是否支持工具调用需要另行验证，当前没有实现任意厂商原生 API 适配。
 
