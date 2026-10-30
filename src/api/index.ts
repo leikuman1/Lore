@@ -18,9 +18,12 @@ const server = serve(
 function shutdown() {
   const timeout = setTimeout(() => process.exit(1), 10_000);
   timeout.unref();
+  const closing = app.close();
   server.close(() => {
-    clearTimeout(timeout);
-    process.exit(0);
+    void closing.finally(() => {
+      clearTimeout(timeout);
+      process.exit(0);
+    });
   });
 }
 

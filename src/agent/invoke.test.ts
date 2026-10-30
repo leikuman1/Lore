@@ -268,6 +268,14 @@ describe("bounded agent invocation", () => {
     expect(result.usage).toMatchObject({ inputTokens: 3, outputTokens: 2, totalTokens: 5 });
   });
 
+  it("rejects necessary context before making a model request", async () => {
+    const model = createMockModel();
+    const request = vi.spyOn(model, "doStream");
+    const result = await invokeAgent({ message: "large message" }, { model, maxContextBytes: 1 });
+    expect(result.finishReason).toBe("CONTEXT_LIMIT");
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it("only exposes the fixed reference tool in the runtime registry", () => {
     expect(Object.keys(createReferenceTools())).toEqual(["lookup_reference"]);
   });

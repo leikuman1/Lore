@@ -2,7 +2,24 @@
 
 使用 TypeScript + Vercel AI SDK 构建的工具型 Agent，计划支持持久化任务、人工审批、版本化记忆和 MCP 工具调用。服务按普通 Node.js 进程设计，不要求部署到 Vercel。
 
-当前阶段：**阶段一，最小 Agent 调用闭环**。提供本地健康接口、非持久化调用接口、独立执行器、显式 mock 模型、固定参考工具与结构化事件。执行通过 Vercel AI SDK，支持步数上限、超时和取消。模型可使用本机 Magpie 网关，支持 Chat Completions 与 Responses 协议；已通过 DeepSeek 的真实工具调用 smoke。持久化任务、审批、记忆、MCP 和 UI 尚未实现。
+当前已实现**本地工作区 Agent 与极简网页**：从页面选择 Windows 目录，连续对话驱动列目录、读取、搜索、创建和精确修改 UTF-8 文件，展示工具事件与文件变更。执行通过 Vercel AI SDK，支持步数上限、超时和取消，模型沿用本机 Magpie。阶段一的健康与单次调用接口继续保留；持久化任务、审批、长期记忆和运行时 MCP 尚未实现。
+
+## 本地工作区页面
+
+在项目根目录运行 `pnpm dev`，打开 **http://127.0.0.1:3001/**，点击“选择文件夹”，通过 Windows 原生窗口选择一个已有目录，然后输入任务。页面提供连续追问、取消、切换工作区、新会话、实时工具事件以及文件修改前后内容。目录选择需要本机可交互的 Windows 桌面；浏览器打开在别的设备上不会选择那个设备的目录。
+
+使用 `.env` 中的 Magpie 配置即可处理自然语言任务；此前若显式设置过 `MODEL_PROVIDER=mock`，先清除该进程环境覆盖。可先在工作区副本中尝试：“读取说明文件，创建一份待办清单”，再追问修改清单。
+
+- 工作区固定于当前会话，任务结束后才能切换；刷新页面可以恢复当前任务与最近结果，重启服务后会话消失。对话最多保留 8 轮，按整轮裁剪，模型消息使用 128 KiB 字节预算并预留输出空间，这不是精确 token 计数。
+- 工具仅接受相对路径，拒绝目录穿越、盘符、UNC、NTFS 数据流、保留设备名、链接/junction 与硬链接；默认排除 `.git`、`node_modules`、`dist`、环境文件和常见密钥路径。排除规则不能识别任意文件中的所有秘密，选择目录时应检查其内容。
+- 仅支持严格 UTF-8 文本，每个文件最多 64 KiB；目录列表和搜索结果最多约 16 KiB，并显示排除与截断。搜索最多访问 1000 个条目、深入 8 层，读取预算为 1 MiB：每次读取前预留最多 64 KiB，成功后按实际 UTF-8 字节结算并退回余量，失败读取释放预留；`bytesRead` 表示成功解码的内容字节数，失败尝试仍受条目数和单文件大小限制。
+- 修改前需要完整读取返回的版本，校验内容和文件身份；精确替换只能匹配一处，创建不覆盖。修改保留 UTF-8 BOM 和既有 CRLF。新文件的父目录必须已存在。
+- 取消不会回滚已完成写入，页面等待已启动文件操作结束后解除锁定。这里只提供应用层文件边界，不能对抗恶意本地进程在检查与使用之间替换目录；不提供操作系统沙箱、shell、删除或通用网络工具。
+- 工作区修改接口要求同源请求，页面与 API 只监听 loopback。模型密钥不传给浏览器；日志仅含执行元数据。工具返回的相对路径、文件正文和搜索片段会进入模型上下文，并发送给配置的模型服务；本机 Magpie 也可能转发到远程上游。仅本机监听不代表文件内容始终留在本机，文件名排除规则也不等于正文脱敏。
+
+离线演示可设置 `MODEL_PROVIDER=mock`。工作区模式下普通输入演示列目录；也可输入 `mock:{"tool":"create_file","input":{"path":"demo.txt","content":"hello"}}` 演示真实文件创建。mock 不理解任意自然语言，文件操作仍经过同一权限与冲突检查。
+
+`pnpm smoke:phase-02` 构建并启动临时本机 HTTP 服务，以自动创建的临时目录验证页面、选目录回调、读取、修改、创建、连续任务、同源保护和切换；不会打开真实目录窗口。真实模型文件任务通过 `RUN_MODEL_SMOKE=1 pnpm smoke:workspace-model` 单独开启，可能产生模型用量，临时文件验证后自动清理。Windows PowerShell 可先设置 `$env:RUN_MODEL_SMOKE="1"` 再运行命令。验收证据与未验证项见 [phase-02-verification.md](docs/phase-02-verification.md)。
 
 ## 阶段一演示
 
@@ -93,11 +110,15 @@ Supabase 项目可在 Dashboard → Connect 复制连接串，或在本机使用
 
 ### Supabase MCP（可选）
 
-如需 Supabase MCP，将 `.mcp.example.json` 复制为本地 `.mcp.json`，将 URL 中的 `YOUR_DEV_PROJECT_REF` 替换为专用开发项目标识，必须保留 `project_ref`，不得使用无项目范围的 URL；`.mcp.json` 已被 Git 忽略，不提交个人项目标识。示例启用只读模式，仅用于在 Claude Code 中查询 schema、文档和调试信息，**不是 Lore 运行时的依赖**，也不替代应用自己的数据库迁移。首次使用先在普通终端运行 `claude` 启动 Claude Code，再在 Claude Code 提示符中输入 `/mcp` 完成 OAuth 授权；工具权限应限制为只读，写操作（迁移、SQL 执行）由项目自己的迁移流程完成。`npx skills add supabase/agent-skills` 为可选项，安装前先确认来源与内容。
+如需 Supabase MCP，将 `.mcp.example.json` 复制为本地 `.mcp.json`，将 URL 中的 `YOUR_DEV_PROJECT_REF` 替换为专用开发项目标识，必须保留 `project_ref`，不得使用无项目范围的 URL；`.mcp.json` 已被 Git 忽略，不提交个人项目标识。示例启用只读模式，并通过 `features=database,docs,debugging` 仅开放数据库、文档和调试工具组；复制配置时保留该白名单，不默认开放 development、functions 或 branching。该连接仅用于在 Claude Code 中查询 schema、文档和调试信息，**不是 Lore 运行时的依赖**，也不替代应用自己的数据库迁移。首次使用先在普通终端运行 `claude` 启动 Claude Code，再在 Claude Code 提示符中输入 `/mcp` 完成 OAuth 授权；工具权限应限制为只读，写操作（迁移、SQL 执行）由项目自己的迁移流程完成。`npx skills add supabase/agent-skills` 为可选项，安装前先确认来源与内容。
 
-### Magpie 模型调用
+### 模型连接与 Magpie
 
-在本地 `.env` 中配置（网关需先启动）：
+使用 Magpie 时，必填 `MODEL_PROVIDER=magpie` 和 `MODEL_ID`。`MODEL_BASE_URL` 默认为 `http://127.0.0.1:3425/v1`，`MODEL_API` 默认为 `chat`，只有需要覆盖默认值时才设置它们。网关要求认证时，由使用者在本地 `.env` 或进程环境中配置 `MODEL_API_KEY`；仓库仅提交不含真实密钥的 `.env.example`。
+
+当前真实模型入口名为 `magpie`，通过 `@ai-sdk/openai` 发送兼容协议请求，默认地址是本机 Magpie。Magpie 负责将请求交给其配置的上游模型，Lore 不读取或发布网关的上游账号配置。地址、模型和 key 都可以由用户覆盖；其他兼容服务是否支持工具调用需要另行验证，当前没有实现任意厂商原生 API 适配。
+
+本机 Magpie 配置示例（网关需先启动）：
 
 ```dotenv
 MODEL_PROVIDER=magpie
@@ -121,8 +142,8 @@ Remove-Item Env:RUN_MODEL_SMOKE
 
 ## 开发边界与路线
 
-- 阶段一仅提供本地、单次、非持久化调用；后续实现以对应阶段的验收标准为准。
-- 首期做单用户开发环境、单 Agent、一个模型连接、一个外部 MCP 测试服务和最小 Web 入口；公开部署前必须补齐真实认证与隔离。
+- 阶段一提供单次调用，阶段二提供本地工作区页面与内存连续会话；后续实现以对应阶段的验收标准为准。
+- 当前面向本机单用户、单 Agent 与配置的模型连接；外部 MCP 与公开部署仍属后续范围，公开部署前必须补齐认证与隔离。
 - API 接收意图、查询状态；后续 Worker 驱动持久任务。模型适配器调用 Vercel AI SDK，数据库负责应用状态，工具执行经过后端授权。
 - 功能验收标准见 [acceptance.md](docs/acceptance.md)；技术职责和实现路线见 [architecture.md](docs/architecture.md)。所有业务验收当前均待完成。
 

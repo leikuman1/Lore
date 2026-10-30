@@ -15,7 +15,8 @@ export type ErrorCode =
   | "TOOL_ERROR"
   | "STEP_LIMIT"
   | "TIMEOUT"
-  | "ABORTED";
+  | "ABORTED"
+  | "CONTEXT_LIMIT";
 
 export const errorMessages: Record<ErrorCode, string> = {
   INVALID_REQUEST:
@@ -28,6 +29,7 @@ export const errorMessages: Record<ErrorCode, string> = {
   STEP_LIMIT: "The maximum number of model steps was reached.",
   TIMEOUT: "The invocation exceeded its time limit.",
   ABORTED: "The invocation was cancelled.",
+  CONTEXT_LIMIT: "Required conversation context exceeds the configured byte budget.",
 };
 
 export type ToolSummary = {
@@ -54,6 +56,7 @@ export type InvocationEvent = {
   tool: string | null;
   status: string;
   durationMs: number;
+  path?: string;
 };
 
 export type InvocationResult = {

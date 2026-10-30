@@ -18,7 +18,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "smoke:phase-01": "pnpm build && node scripts/smoke-phase-01.mjs",
+    "smoke:phase-02": "pnpm build && node scripts/smoke-phase-02.mjs",
     "smoke:model": "node scripts/with-ca.mjs --import tsx scripts/smoke-model.ts",
+    "smoke:workspace-model": "node scripts/with-ca.mjs --import tsx scripts/smoke-workspace-model.ts",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "doctor": "tsx scripts/doctor.ts",
     "db:check": "node scripts/with-ca.mjs --import tsx scripts/check-db.ts"
